@@ -105,7 +105,7 @@
         <p class="text-xs sm:text-sm text-slate-400 mt-1">ダイナミック大盤面・ローカル2人対戦モード</p>
     </header>
 
-    <!-- メインコンテンツ領域（大画面向けにmax-wを拡張し、盤面を主役に） -->
+    <!-- メインコンテンツ領域 -->
     <main class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center flex-grow px-2">
         
         <!-- 左サイド：プレイヤー情報 ＆ コントロール -->
@@ -165,17 +165,11 @@
                         </span>
                         <input type="checkbox" id="chk-guide" checked class="w-4 h-4 rounded text-amber-500 bg-slate-700 border-slate-600 focus:ring-amber-500">
                     </label>
-                    <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer select-none">
-                        <span class="flex items-center gap-2">
-                            <i class="fa-solid fa-volume-high text-indigo-400"></i> 音声で手番を読み上げ
-                        </span>
-                        <input type="checkbox" id="chk-audio" checked class="w-4 h-4 rounded text-amber-500 bg-slate-700 border-slate-600 focus:ring-amber-500">
-                    </label>
                 </div>
             </div>
         </div>
 
-        <!-- 中央：メインゲーム大盤面（幅の制限を最大 640px まで拡張） -->
+        <!-- 中央：メインゲーム大盤面 -->
         <div class="w-full lg:w-2/4 flex flex-col items-center order-1 lg:order-2">
             <!-- 状態表示メッセージバー -->
             <div id="status-bar" class="w-full max-w-[640px] bg-indigo-950/80 border border-indigo-500/30 text-indigo-200 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-medium shadow-md flex items-center justify-center gap-2">
@@ -183,7 +177,7 @@
                 <span>プレイヤー1 (黒) のターンです。石を置いてください。</span>
             </div>
 
-            <!-- オセロ盤コンテナ（max-w-[480px] から max-w-[640px] へ大幅拡張） -->
+            <!-- オセロ盤コンテナ -->
             <div class="board-container w-full max-w-[640px] aspect-square flex items-center justify-center">
                 <div id="board" class="othello-board w-full h-full grid grid-cols-8 grid-rows-8 relative p-1.5 gap-1.5">
                     <!-- JavaScriptでここにマス目を生成 -->
@@ -208,7 +202,7 @@
             <!-- ログ & 実況 -->
             <div class="bg-slate-800/60 rounded-xl p-4 shadow-lg border border-slate-700 flex flex-col h-[200px] lg:h-[320px]">
                 <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-list-ul text-rose-500"></i> 対局ログ & 実況
+                    <i class="fa-solid fa-list-ul text-rose-500"></i> 对局ログ & 実況
                 </h3>
                 <div id="game-log" class="flex-grow overflow-y-auto text-xs space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-700">
                     <div class="text-emerald-400 font-semibold">ゲームが開始されました。</div>
@@ -296,7 +290,6 @@
         const btnUndo = document.getElementById('btn-undo');
         const btnRestart = document.getElementById('btn-restart');
         const chkGuide = document.getElementById('chk-guide');
-        const chkAudio = document.getElementById('chk-audio');
         const gameLogEl = document.getElementById('game-log');
 
         const barBlack = document.getElementById('bar-black');
@@ -313,18 +306,6 @@
         const modalComment = document.getElementById('modal-comment');
         const modalBtnClose = document.getElementById('modal-btn-close');
         const modalBtnRestart = document.getElementById('modal-btn-restart');
-
-        // --- 音声合成設定 ---
-        function speak(text) {
-            if (!chkAudio.checked) return;
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel(); // 進行中の音声をクリア
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'ja-JP';
-                utterance.rate = 1.1;
-                window.speechSynthesis.speak(utterance);
-            }
-        }
 
         // --- ゲーム初期化 ---
         function initGame() {
@@ -346,9 +327,6 @@
 
             createBoardDOM();
             updateUI();
-            
-            // 音声発話
-            speak(`${getPlayerName(1)}さん、黒番です。始めてください。`);
         }
 
         // プレイヤー名取得
@@ -598,8 +576,6 @@
             if (nextPlayerMoves.length > 0) {
                 // 通常通り次の人のターン
                 updateUI();
-                const announceText = `${getPlayerName(currentPlayer)}さん、${currentPlayer === 1 ? '黒' : '白'}番の番です。`;
-                speak(announceText);
             } else {
                 // パス、もしくは終局
                 const opposingPlayerMoves = getValidMoves(-currentPlayer);
@@ -608,7 +584,6 @@
                     // パス
                     const passMsg = `<div class="text-yellow-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${getPlayerName(currentPlayer)} (${currentPlayer === 1 ? '黒' : '白'}) に置ける場所がありません。パスします。</div>`;
                     addLog(passMsg);
-                    speak(`${getPlayerName(currentPlayer)}さんは置ける場所がありません。パスになります。`);
 
                     currentPlayer = -currentPlayer; // 相手に手番を返す
                     updateUI();
@@ -641,20 +616,16 @@
 
             let winnerText = '';
             let comment = '';
-            let announceVoice = '';
 
             if (countBlack > countWhite) {
                 winnerText = `勝者: ${getPlayerName(1)} (黒) 🎉`;
                 comment = `${getPlayerName(1)}さんが${countBlack - countWhite}石差で素晴らしい勝利を収めました！`;
-                announceVoice = `対局終了。黒の${getPlayerName(1)}さんの勝ちです。おめでとうございます！`;
             } else if (countWhite > countBlack) {
                 winnerText = `勝者: ${getPlayerName(-1)} (白) 🎉`;
                 comment = `${getPlayerName(-1)}さんが${countWhite - countBlack}石差で素晴らしい勝利を収めました！`;
-                announceVoice = `対局終了。白の${getPlayerName(-1)}さんの勝ちです。おめでとうございます！`;
             } else {
                 winnerText = '引き分けです！ 🤝';
                 comment = '両者一歩も譲らぬ大接戦でした！素晴らしい技術です。';
-                announceVoice = '対局終了。引き分けです。両者とも、素晴らしい対局でした。';
             }
 
             // ログへの書き出し
@@ -665,9 +636,6 @@
             modalBlackScore.textContent = countBlack;
             modalWhiteScore.textContent = countWhite;
             modalComment.textContent = comment;
-
-            // アナウンス
-            speak(announceVoice);
 
             // モーダルをじんわり表示
             statusBarEl.className = "w-full max-w-[640px] bg-amber-950 border border-amber-500/50 text-amber-300 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-bold shadow-md";
@@ -690,7 +658,6 @@
 
             addLog(`<div class="text-slate-400 italic"><i class="fa-solid fa-backward-step mr-1"></i> ${getPlayerName(currentPlayer)}が「待った」を使用しました。</div>`);
             updateUI();
-            speak(`${getPlayerName(currentPlayer)}さんが一手戻しました。${currentPlayer === 1 ? '黒' : '白'}番から再開です。`);
         }
 
         // --- イベントリスナー登録 ---
