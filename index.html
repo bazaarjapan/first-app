@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プレミアム対戦オセロゲーム</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome (アイコン用) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans JP', sans-serif;
+            background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
+            min-height: 100vh;
+        }
+        /* 盤面の3D効果 */
+        .board-container {
+            perspective: 1200px;
+        }
+        .othello-board {
+            transform: rotateX(8deg);
+            box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.8);
+            border: 14px solid #3b2314; /* 高級感のある木製風の枠 */
+            border-radius: 12px;
+            background-color: #1b4332; /* 深い緑色 */
+        }
+        /* マス目のスタイル */
+        .othello-cell {
+            position: relative;
+            background-color: #2d6a4f;
+            box-shadow: inset 0 0 0 1px #1b4332;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+        .othello-cell:hover {
+            background-color: #40916c;
+        }
+        /* 石のスタイルとアニメーション */
+        .disc {
+            position: absolute;
+            width: 86%;
+            height: 86%;
+            top: 7%;
+            left: 7%;
+            border-radius: 50%;
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transform-style: preserve-3d;
+        }
+        /* 黒石（光沢と立体感） */
+        .disc-black {
+            background: radial-gradient(circle at 30% 30%, #4b5563 0%, #111827 80%, #000000 100%);
+            border: 1px solid #374151;
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.6), inset -3px -3px 8px rgba(0, 0, 0, 0.8), inset 3px 3px 8px rgba(255, 255, 255, 0.2);
+        }
+        /* 白石（光沢と立体感） */
+        .disc-white {
+            background: radial-gradient(circle at 30% 30%, #ffffff 0%, #f3f4f6 60%, #d1d5db 100%);
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 8px 12px rgba(0, 0, 0, 0.4), inset -3px -3px 8px rgba(0, 0, 0, 0.2), inset 3px 3px 6px rgba(255, 255, 255, 0.8);
+        }
+        /* ひっくり返るアニメーション */
+        .flip {
+            transform: rotateY(180deg);
+        }
+        /* ガイド（配置可能場所）のドット */
+        .guide-dot {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(245, 158, 11, 0.75);
+            border-radius: 50%;
+            animation: pulse 1.5s infinite;
+            box-shadow: 0 0 8px rgba(245, 158, 11, 0.8);
+        }
+        @keyframes pulse {
+            0% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.5; }
+            50% { transform: translate(-50%, -50%) scale(1.1); opacity: 0.9; }
+            100% { transform: translate(-50%, -50%) scale(0.7); opacity: 0.5; }
+        }
+        /* 盤上の星（オセロのポインティングマーク） */
+        .star-point {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background-color: #0f172a;
+            border-radius: 50%;
+            z-index: 5;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body class="text-white flex flex-col justify-between p-2 sm:p-4 md:p-6 overflow-x-hidden min-h-screen">
+
+    <!-- ヘッダー -->
+    <header class="w-full max-w-7xl mx-auto mb-4 text-center">
+        <h1 class="text-3xl sm:text-5xl font-extrabold tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-amber-400 via-rose-400 to-indigo-400">
+            PREMIUM OTHELLO
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-400 mt-1">ダイナミック大盤面・ローカル2人対戦モード</p>
+    </header>
+
+    <!-- メインコンテンツ領域（大画面向けにmax-wを拡張し、盤面を主役に） -->
+    <main class="w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-center lg:items-start justify-center flex-grow px-2">
+        
+        <!-- 左サイド：プレイヤー情報 ＆ コントロール -->
+        <div class="w-full lg:w-1/4 xl:w-1/5 flex flex-col gap-4 order-2 lg:order-1">
+            <!-- プレイヤー1（黒） -->
+            <div id="player-black-card" class="bg-slate-800/80 border-2 border-amber-500 rounded-xl p-4 flex items-center justify-between shadow-lg transition-all duration-300">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-full disc-black flex items-center justify-center shadow-md relative">
+                        <span class="absolute text-xs text-white font-bold">先手</span>
+                    </div>
+                    <div>
+                        <div class="text-xs text-amber-500 font-bold uppercase tracking-wide">Player 1</div>
+                        <input type="text" id="p1-name" value="プレイヤー1" class="bg-transparent font-bold text-lg text-white border-b border-transparent hover:border-slate-500 focus:border-amber-500 focus:outline-none w-28 transition-colors">
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="score-black" class="text-3xl font-black tracking-tight text-white">2</div>
+                    <div class="text-xs text-slate-400">石の数</div>
+                </div>
+            </div>
+
+            <!-- プレイヤー2（白） -->
+            <div id="player-white-card" class="bg-slate-800/40 border-2 border-transparent rounded-xl p-4 flex items-center justify-between shadow-lg transition-all duration-300">
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-full disc-white flex items-center justify-center shadow-md relative">
+                        <span class="absolute text-xs text-slate-800 font-bold">後手</span>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400 font-bold uppercase tracking-wide">Player 2</div>
+                        <input type="text" id="p2-name" value="プレイヤー2" class="bg-transparent font-bold text-lg text-white border-b border-transparent hover:border-slate-500 focus:border-amber-500 focus:outline-none w-28 transition-colors">
+                    </div>
+                </div>
+                <div class="text-right">
+                    <div id="score-white" class="text-3xl font-black tracking-tight text-white">2</div>
+                    <div class="text-xs text-slate-400">石の数</div>
+                </div>
+            </div>
+
+            <!-- コントロールパネル -->
+            <div class="bg-slate-800/60 rounded-xl p-4 shadow-lg border border-slate-700">
+                <h3 class="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-amber-500"></i> ゲーム設定 & 操作
+                </h3>
+                <div class="flex flex-col gap-2">
+                    <button id="btn-undo" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 disabled:opacity-40 disabled:hover:bg-slate-700 text-white rounded-lg font-bold flex items-center justify-center gap-2 transition-all" disabled>
+                        <i class="fa-solid fa-rotate-left"></i> 一手戻る (待った)
+                    </button>
+                    <button id="btn-restart" class="w-full py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 rounded-lg font-bold flex items-center justify-center gap-2 transition-all shadow-md">
+                        <i class="fa-solid fa-arrows-rotate"></i> 初めからやり直す
+                    </button>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-700 flex flex-col gap-2.5">
+                    <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer select-none">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-eye text-emerald-500"></i> 置ける場所をハイライト
+                        </span>
+                        <input type="checkbox" id="chk-guide" checked class="w-4 h-4 rounded text-amber-500 bg-slate-700 border-slate-600 focus:ring-amber-500">
+                    </label>
+                    <label class="flex items-center justify-between text-xs text-slate-300 cursor-pointer select-none">
+                        <span class="flex items-center gap-2">
+                            <i class="fa-solid fa-volume-high text-indigo-400"></i> 音声で手番を読み上げ
+                        </span>
+                        <input type="checkbox" id="chk-audio" checked class="w-4 h-4 rounded text-amber-500 bg-slate-700 border-slate-600 focus:ring-amber-500">
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央：メインゲーム大盤面（幅の制限を最大 640px まで拡張） -->
+        <div class="w-full lg:w-2/4 flex flex-col items-center order-1 lg:order-2">
+            <!-- 状態表示メッセージバー -->
+            <div id="status-bar" class="w-full max-w-[640px] bg-indigo-950/80 border border-indigo-500/30 text-indigo-200 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-medium shadow-md flex items-center justify-center gap-2">
+                <span class="animate-ping inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400"></span>
+                <span>プレイヤー1 (黒) のターンです。石を置いてください。</span>
+            </div>
+
+            <!-- オセロ盤コンテナ（max-w-[480px] から max-w-[640px] へ大幅拡張） -->
+            <div class="board-container w-full max-w-[640px] aspect-square flex items-center justify-center">
+                <div id="board" class="othello-board w-full h-full grid grid-cols-8 grid-rows-8 relative p-1.5 gap-1.5">
+                    <!-- JavaScriptでここにマス目を生成 -->
+                </div>
+            </div>
+
+            <!-- 形勢メーター & 進捗 -->
+            <div class="w-full max-w-[640px] mt-6 bg-slate-800 rounded-full h-3 overflow-hidden shadow-inner flex">
+                <div id="bar-black" class="bg-slate-950 transition-all duration-500" style="width: 3.125%;"></div>
+                <div id="bar-green" class="bg-emerald-600 transition-all duration-500" style="width: 93.75%;"></div>
+                <div id="bar-white" class="bg-slate-100 transition-all duration-500" style="width: 3.125%;"></div>
+            </div>
+            <div class="w-full max-w-[640px] flex justify-between text-xs sm:text-sm text-slate-400 mt-2 px-1">
+                <span class="font-bold">黒: <span id="percent-black">3.1%</span></span>
+                <span class="text-slate-300">残り空きマス: <span id="empty-cells" class="font-semibold text-amber-400">60</span></span>
+                <span class="font-bold text-white">白: <span id="percent-white" class="text-slate-300">3.1%</span></span>
+            </div>
+        </div>
+
+        <!-- 右サイド：形勢履歴 ＆ ゲームの進捗 -->
+        <div class="w-full lg:w-1/4 xl:w-1/5 flex flex-col gap-4 order-3">
+            <!-- ログ & 実況 -->
+            <div class="bg-slate-800/60 rounded-xl p-4 shadow-lg border border-slate-700 flex flex-col h-[200px] lg:h-[320px]">
+                <h3 class="text-sm font-bold text-slate-300 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-list-ul text-rose-500"></i> 対局ログ & 実況
+                </h3>
+                <div id="game-log" class="flex-grow overflow-y-auto text-xs space-y-1.5 pr-1 scrollbar-thin scrollbar-thumb-slate-700">
+                    <div class="text-emerald-400 font-semibold">ゲームが開始されました。</div>
+                </div>
+            </div>
+
+            <!-- 簡易説明 -->
+            <div class="bg-slate-800/40 rounded-xl p-4 shadow-lg border border-slate-700/60 text-xs text-slate-300">
+                <h4 class="font-bold text-slate-200 mb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-circle-question text-sky-400"></i> 盤面情報
+                </h4>
+                <ul class="list-disc list-inside space-y-1 text-slate-400">
+                    <li>盤上の点（星）は配置の目安です。</li>
+                    <li>四隅のマス（角）を確保すると有利です。</li>
+                    <li>ガイドドットを頼りに戦略を練りましょう。</li>
+                </ul>
+            </div>
+        </div>
+    </main>
+
+    <!-- フッター -->
+    <footer class="w-full max-w-7xl mx-auto mt-8 text-center text-xs text-slate-500 border-t border-slate-800/60 pt-4 pb-2">
+        &copy; 2026 Premium Othello Duels. All rights reserved.
+    </footer>
+
+    <!-- ゲーム終了時のモーダルダイアログ -->
+    <div id="gameover-modal" class="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-50 opacity-0 pointer-events-none transition-opacity duration-300">
+        <div class="bg-slate-800 border-2 border-slate-700 rounded-2xl p-6 sm:p-8 max-w-md w-11/12 text-center shadow-2xl transform scale-95 transition-transform duration-300">
+            <div class="w-20 h-20 mx-auto bg-gradient-to-tr from-amber-500 to-amber-300 rounded-full flex items-center justify-center mb-4 shadow-lg">
+                <i class="fa-solid fa-trophy text-slate-950 text-4xl animate-bounce"></i>
+            </div>
+            <h2 class="text-3xl font-extrabold text-white tracking-wider mb-1">対局終了！</h2>
+            <div id="winner-banner" class="text-amber-400 font-bold text-lg mb-6">勝者: プレイヤー1 (黒)</div>
+            
+            <div class="grid grid-cols-2 gap-4 bg-slate-900/60 p-4 rounded-xl mb-6 border border-slate-700">
+                <div class="text-center">
+                    <div class="text-xs text-slate-400 mb-1">プレイヤー1 (黒)</div>
+                    <div id="modal-black-score" class="text-3xl font-black text-white">0</div>
+                </div>
+                <div class="text-center border-l border-slate-700">
+                    <div class="text-xs text-slate-400 mb-1">プレイヤー2 (白)</div>
+                    <div id="modal-white-score" class="text-3xl font-black text-white">0</div>
+                </div>
+            </div>
+
+            <div id="modal-comment" class="text-sm text-slate-300 mb-6 italic">素晴らしい大熱戦でした！</div>
+
+            <div class="flex gap-3">
+                <button id="modal-btn-close" class="flex-1 py-3 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-xl transition-all">
+                    盤面を見る
+                </button>
+                <button id="modal-btn-restart" class="flex-1 py-3 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold rounded-xl transition-all shadow-md">
+                    もう一度遊ぶ
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- ゲーム状態変数 ---
+        // 0: 空, 1: 黒, -1: 白
+        let boardState = Array(8).fill(null).map(() => Array(8).fill(0));
+        let currentPlayer = 1; // 1: 黒(先手), -1: 白(後手)
+        let history = []; // 一手戻る用スタック
+        let gameActive = true;
+
+        // 星（ポインティングマーク）の配置座標
+        const starPoints = [[2, 2], [2, 6], [6, 2], [6, 6]];
+
+        // 8方向の定義（上、右上、右、右下、下、左下、左、左上）
+        const directions = [
+            [-1, 0], [-1, 1], [0, 1], [1, 1],
+            [1, 0], [1, -1], [0, -1], [-1, -1]
+        ];
+
+        // --- DOM要素 ---
+        const boardEl = document.getElementById('board');
+        const statusBarEl = document.getElementById('status-bar');
+        const p1NameInput = document.getElementById('p1-name');
+        const p2NameInput = document.getElementById('p2-name');
+        const scoreBlackEl = document.getElementById('score-black');
+        const scoreWhiteEl = document.getElementById('score-white');
+        const p1Card = document.getElementById('player-black-card');
+        const p2Card = document.getElementById('player-white-card');
+        const btnUndo = document.getElementById('btn-undo');
+        const btnRestart = document.getElementById('btn-restart');
+        const chkGuide = document.getElementById('chk-guide');
+        const chkAudio = document.getElementById('chk-audio');
+        const gameLogEl = document.getElementById('game-log');
+
+        const barBlack = document.getElementById('bar-black');
+        const barGreen = document.getElementById('bar-green');
+        const barWhite = document.getElementById('bar-white');
+        const percentBlackEl = document.getElementById('percent-black');
+        const percentWhiteEl = document.getElementById('percent-white');
+        const emptyCellsEl = document.getElementById('empty-cells');
+
+        const gameOverModal = document.getElementById('gameover-modal');
+        const winnerBanner = document.getElementById('winner-banner');
+        const modalBlackScore = document.getElementById('modal-black-score');
+        const modalWhiteScore = document.getElementById('modal-white-score');
+        const modalComment = document.getElementById('modal-comment');
+        const modalBtnClose = document.getElementById('modal-btn-close');
+        const modalBtnRestart = document.getElementById('modal-btn-restart');
+
+        // --- 音声合成設定 ---
+        function speak(text) {
+            if (!chkAudio.checked) return;
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel(); // 進行中の音声をクリア
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'ja-JP';
+                utterance.rate = 1.1;
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // --- ゲーム初期化 ---
+        function initGame() {
+            boardState = Array(8).fill(null).map(() => Array(8).fill(0));
+            // 初期配置
+            boardState[3][3] = -1; // 白
+            boardState[3][4] = 1;  // 黒
+            boardState[4][3] = 1;  // 黒
+            boardState[4][4] = -1; // 白
+
+            currentPlayer = 1; // 黒から
+            history = [];
+            gameActive = true;
+
+            btnUndo.disabled = true;
+            
+            // ログのクリア
+            gameLogEl.innerHTML = `<div class="text-emerald-400 font-semibold"><i class="fa-solid fa-play mr-1"></i> 新しい対局が開始されました。</div>`;
+
+            createBoardDOM();
+            updateUI();
+            
+            // 音声発話
+            speak(`${getPlayerName(1)}さん、黒番です。始めてください。`);
+        }
+
+        // プレイヤー名取得
+        function getPlayerName(playerValue) {
+            if (playerValue === 1) {
+                return p1NameInput.value.trim() || 'プレイヤー1';
+            } else {
+                return p2NameInput.value.trim() || 'プレイヤー2';
+            }
+        }
+
+        // 盤面DOMの生成
+        function createBoardDOM() {
+            boardEl.innerHTML = '';
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'othello-cell aspect-square rounded-sm';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+
+                    // 星の描画
+                    if (starPoints.some(pt => pt[0] === r && pt[1] === c)) {
+                        const star = document.createElement('div');
+                        star.className = 'star-point';
+                        // 四隅のマスの中に星点を配置するためのオフセット設定
+                        if (r === 2) star.style.top = '100%'; else star.style.top = '0%';
+                        if (c === 2) star.style.left = '100%'; else star.style.left = '0%';
+                        cell.appendChild(star);
+                    }
+
+                    // クリックイベント
+                    cell.addEventListener('click', () => handleCellClick(r, c));
+                    boardEl.appendChild(cell);
+                }
+            }
+        }
+
+        // --- ルール処理エンジン ---
+
+        // 有効な位置か
+        function isValidCoords(r, c) {
+            return r >= 0 && r < 8 && c >= 0 && c < 8;
+        }
+
+        // 特定の方向に挟める石があるか、またその反転リストを返す
+        function getFlipsInDirection(row, col, dRow, dCol, player) {
+            let r = row + dRow;
+            let c = col + dCol;
+            const opposing = -player;
+            const flips = [];
+
+            while (isValidCoords(r, c) && boardState[r][c] === opposing) {
+                flips.push([r, c]);
+                r += dRow;
+                c += dCol;
+            }
+
+            if (isValidCoords(r, c) && boardState[r][c] === player && flips.length > 0) {
+                return flips;
+            }
+            return [];
+        }
+
+        // 全方向に挟める石をすべて取得する
+        function getAllFlips(row, col, player) {
+            if (boardState[row][col] !== 0) return [];
+            
+            let allFlips = [];
+            for (const [dRow, dCol] of directions) {
+                const flips = getFlipsInDirection(row, col, dRow, dCol, player);
+                allFlips = allFlips.concat(flips);
+            }
+            return allFlips;
+        }
+
+        // 置くことができるマスのリストを取得
+        function getValidMoves(player) {
+            const moves = [];
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (getAllFlips(r, c, player).length > 0) {
+                        moves.push([r, c]);
+                    }
+                }
+            }
+            return moves;
+        }
+
+        // --- 描画＆UI更新 ---
+        function updateUI() {
+            const validMoves = getValidMoves(currentPlayer);
+
+            // マス目の更新
+            const cells = boardEl.querySelectorAll('.othello-cell');
+            cells.forEach(cell => {
+                const r = parseInt(cell.dataset.row);
+                const c = parseInt(cell.dataset.col);
+                const val = boardState[r][c];
+
+                // ガイドドットと石を一旦クリア（星以外）
+                const existingDisc = cell.querySelector('.disc');
+                const existingGuide = cell.querySelector('.guide-dot');
+                if (existingDisc) cell.removeChild(existingDisc);
+                if (existingGuide) cell.removeChild(existingGuide);
+
+                // 石の描画
+                if (val !== 0) {
+                    const disc = document.createElement('div');
+                    disc.className = `disc ${val === 1 ? 'disc-black' : 'disc-white'}`;
+                    cell.appendChild(disc);
+                } 
+                // 置ける場所のガイド表示（設定有効時のみ）
+                else if (chkGuide.checked && validMoves.some(mv => mv[0] === r && mv[1] === c) && gameActive) {
+                    const guide = document.createElement('div');
+                    guide.className = 'guide-dot';
+                    cell.appendChild(guide);
+                }
+            });
+
+            // 得点の計算
+            let countBlack = 0;
+            let countWhite = 0;
+            let countEmpty = 0;
+
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (boardState[r][c] === 1) countBlack++;
+                    else if (boardState[r][c] === -1) countWhite++;
+                    else countEmpty++;
+                }
+            }
+
+            scoreBlackEl.textContent = countBlack;
+            scoreWhiteEl.textContent = countWhite;
+
+            // 形勢バーの割合計算
+            const total = countBlack + countWhite + countEmpty;
+            const pctBlack = ((countBlack / total) * 100).toFixed(1) + '%';
+            const pctWhite = ((countWhite / total) * 100).toFixed(1) + '%';
+            const pctGreen = ((countEmpty / total) * 100).toFixed(1) + '%';
+
+            barBlack.style.width = pctBlack;
+            barGreen.style.width = pctGreen;
+            barWhite.style.width = pctWhite;
+
+            percentBlackEl.textContent = pctBlack;
+            percentWhiteEl.textContent = pctWhite;
+            emptyCellsEl.textContent = countEmpty;
+
+            // アクティブなプレイヤーカードのハイライト
+            if (gameActive) {
+                if (currentPlayer === 1) {
+                    p1Card.classList.remove('bg-slate-800/40', 'border-transparent');
+                    p1Card.classList.add('bg-slate-800/80', 'border-amber-500');
+                    p2Card.classList.remove('bg-slate-800/80', 'border-amber-500');
+                    p2Card.classList.add('bg-slate-800/40', 'border-transparent');
+                    statusBarEl.className = "w-full max-w-[640px] bg-slate-900 border border-amber-500/30 text-amber-200 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-medium shadow-md flex items-center justify-center gap-2";
+                    statusBarEl.innerHTML = `<span class="animate-ping inline-flex h-2.5 w-2.5 rounded-full bg-amber-400"></span><span>${getPlayerName(1)} (黒) のターンです。</span>`;
+                } else {
+                    p2Card.classList.remove('bg-slate-800/40', 'border-transparent');
+                    p2Card.classList.add('bg-slate-800/80', 'border-amber-500');
+                    p1Card.classList.remove('bg-slate-800/80', 'border-amber-500');
+                    p1Card.classList.add('bg-slate-800/40', 'border-transparent');
+                    statusBarEl.className = "w-full max-w-[640px] bg-slate-800 border border-slate-300/30 text-slate-100 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-medium shadow-md flex items-center justify-center gap-2";
+                    statusBarEl.innerHTML = `<span class="animate-ping inline-flex h-2.5 w-2.5 rounded-full bg-slate-300"></span><span>${getPlayerName(-1)} (白) のターンです。</span>`;
+                }
+            }
+
+            // 待ったボタンの状態
+            btnUndo.disabled = history.length === 0 || !gameActive;
+        }
+
+        // --- アニメーションひっくり返し効果 ---
+        function animateFlip(flips, newPlayer, callback) {
+            let cells = boardEl.querySelectorAll('.othello-cell');
+            let delay = 0;
+
+            // 挟んだ元の位置から波及するように、距離に基づいてソート
+            flips.forEach(([r, c]) => {
+                const cellIndex = r * 8 + c;
+                const cell = cells[cellIndex];
+                const disc = cell.querySelector('.disc');
+
+                if (disc) {
+                    setTimeout(() => {
+                        // 一旦3Dひっくり返りクラスを適用
+                        disc.classList.add('flip');
+                        
+                        // 回転の半分（0.3秒）の時点でクラスを切り替えて色が変化したように見せる
+                        setTimeout(() => {
+                            disc.className = `disc ${newPlayer === 1 ? 'disc-black' : 'disc-white'}`;
+                        }, 300);
+
+                        // 回転終了後にクラスをリセット
+                        setTimeout(() => {
+                            disc.classList.remove('flip');
+                        }, 600);
+                    }, delay);
+                    delay += 70; // なめらかな連鎖ディレイ
+                }
+            });
+
+            // アニメーション完了後に状態引き継ぎ＆ターン交代
+            setTimeout(callback, delay + 250);
+        }
+
+        // --- マスクリックハンドラ ---
+        function handleCellClick(row, col) {
+            if (!gameActive) return;
+
+            const flips = getAllFlips(row, col, currentPlayer);
+            if (flips.length === 0) return; // 置けない場所
+
+            // 手の履歴を保存 (ディープコピー)
+            history.push({
+                board: boardState.map(arr => [...arr]),
+                player: currentPlayer
+            });
+
+            // 盤面に自分の石を置く
+            boardState[row][col] = currentPlayer;
+            const cellChar = String.fromCharCode(65 + col) + (row + 1); // "D4" のような表記
+            const colorName = currentPlayer === 1 ? '黒' : '白';
+            const logMsg = `<div class="text-slate-300"><span class="font-semibold text-amber-400">${getPlayerName(currentPlayer)}</span>(${colorName})が <span class="text-white font-mono bg-slate-700/60 px-1.5 py-0.5 rounded">${cellChar}</span> に打ち、<span class="text-emerald-400 font-bold">${flips.length}個</span>ひっくり返しました。</div>`;
+            addLog(logMsg);
+
+            // ひっくり返しアニメーション開始
+            boardEl.style.pointerEvents = 'none'; // アニメーション中の二重クリック防止
+            animateFlip(flips, currentPlayer, () => {
+                // アニメーション終了後に状態を確定
+                flips.forEach(([r, c]) => {
+                    boardState[r][c] = currentPlayer;
+                });
+
+                // ターン交代
+                currentPlayer = -currentPlayer;
+                checkNextTurn();
+                boardEl.style.pointerEvents = 'auto';
+            });
+        }
+
+        // ターン判定とパスの処理
+        function checkNextTurn() {
+            const nextPlayerMoves = getValidMoves(currentPlayer);
+
+            if (nextPlayerMoves.length > 0) {
+                // 通常通り次の人のターン
+                updateUI();
+                const announceText = `${getPlayerName(currentPlayer)}さん、${currentPlayer === 1 ? '黒' : '白'}番の番です。`;
+                speak(announceText);
+            } else {
+                // パス、もしくは終局
+                const opposingPlayerMoves = getValidMoves(-currentPlayer);
+
+                if (opposingPlayerMoves.length > 0) {
+                    // パス
+                    const passMsg = `<div class="text-yellow-400 font-bold"><i class="fa-solid fa-triangle-exclamation"></i> ${getPlayerName(currentPlayer)} (${currentPlayer === 1 ? '黒' : '白'}) に置ける場所がありません。パスします。</div>`;
+                    addLog(passMsg);
+                    speak(`${getPlayerName(currentPlayer)}さんは置ける場所がありません。パスになります。`);
+
+                    currentPlayer = -currentPlayer; // 相手に手番を返す
+                    updateUI();
+                } else {
+                    // 両者置く場所がないのでゲーム終了
+                    endGame();
+                }
+            }
+        }
+
+        // ログエリアへの追加とスクロール
+        function addLog(htmlContent) {
+            gameLogEl.insertAdjacentHTML('beforeend', htmlContent);
+            gameLogEl.scrollTop = gameLogEl.scrollHeight;
+        }
+
+        // --- ゲーム終了の判定と表示 ---
+        function endGame() {
+            gameActive = false;
+            updateUI();
+
+            let countBlack = 0;
+            let countWhite = 0;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
+                    if (boardState[r][c] === 1) countBlack++;
+                    else if (boardState[r][c] === -1) countWhite++;
+                }
+            }
+
+            let winnerText = '';
+            let comment = '';
+            let announceVoice = '';
+
+            if (countBlack > countWhite) {
+                winnerText = `勝者: ${getPlayerName(1)} (黒) 🎉`;
+                comment = `${getPlayerName(1)}さんが${countBlack - countWhite}石差で素晴らしい勝利を収めました！`;
+                announceVoice = `対局終了。黒の${getPlayerName(1)}さんの勝ちです。おめでとうございます！`;
+            } else if (countWhite > countBlack) {
+                winnerText = `勝者: ${getPlayerName(-1)} (白) 🎉`;
+                comment = `${getPlayerName(-1)}さんが${countWhite - countBlack}石差で素晴らしい勝利を収めました！`;
+                announceVoice = `対局終了。白の${getPlayerName(-1)}さんの勝ちです。おめでとうございます！`;
+            } else {
+                winnerText = '引き分けです！ 🤝';
+                comment = '両者一歩も譲らぬ大接戦でした！素晴らしい技術です。';
+                announceVoice = '対局終了。引き分けです。両者とも、素晴らしい対局でした。';
+            }
+
+            // ログへの書き出し
+            addLog(`<div class="text-amber-400 font-bold mt-2"><i class="fa-solid fa-trophy"></i> 対局が終了しました！ ${winnerText}</div>`);
+            
+            // モーダルデータ更新
+            winnerBanner.textContent = winnerText;
+            modalBlackScore.textContent = countBlack;
+            modalWhiteScore.textContent = countWhite;
+            modalComment.textContent = comment;
+
+            // アナウンス
+            speak(announceVoice);
+
+            // モーダルをじんわり表示
+            statusBarEl.className = "w-full max-w-[640px] bg-amber-950 border border-amber-500/50 text-amber-300 text-center py-3 px-4 rounded-xl mb-4 text-sm sm:text-base font-bold shadow-md";
+            statusBarEl.textContent = `対局終了！ ${winnerText}`;
+
+            setTimeout(() => {
+                gameOverModal.classList.remove('opacity-0', 'pointer-events-none');
+                gameOverModal.querySelector('div').classList.remove('scale-95');
+                gameOverModal.querySelector('div').classList.add('scale-100');
+            }, 800);
+        }
+
+        // --- 待った（一手戻る）処理 ---
+        function undoLastMove() {
+            if (history.length === 0 || !gameActive) return;
+
+            const lastState = history.pop();
+            boardState = lastState.board;
+            currentPlayer = lastState.player;
+
+            addLog(`<div class="text-slate-400 italic"><i class="fa-solid fa-backward-step mr-1"></i> ${getPlayerName(currentPlayer)}が「待った」を使用しました。</div>`);
+            updateUI();
+            speak(`${getPlayerName(currentPlayer)}さんが一手戻しました。${currentPlayer === 1 ? '黒' : '白'}番から再開です。`);
+        }
+
+        // --- イベントリスナー登録 ---
+
+        // 初めから
+        btnRestart.addEventListener('click', () => {
+            initGame();
+        });
+
+        // モーダルの「もう一度遊ぶ」
+        modalBtnRestart.addEventListener('click', () => {
+            gameOverModal.classList.add('opacity-0', 'pointer-events-none');
+            initGame();
+        });
+
+        // モーダルの「盤面を見る」
+        modalBtnClose.addEventListener('click', () => {
+            gameOverModal.classList.add('opacity-0', 'pointer-events-none');
+        });
+
+        // 一手戻る
+        btnUndo.addEventListener('click', undoLastMove);
+
+        // ガイド表示チェックボックス変更時
+        chkGuide.addEventListener('change', updateUI);
+
+        // プレイヤー名の入力バインド（フォーカスアウト時に更新）
+        p1NameInput.addEventListener('blur', updateUI);
+        p2NameInput.addEventListener('blur', updateUI);
+
+        // ロード時に即時ゲームスタート
+        window.addEventListener('DOMContentLoaded', () => {
+            initGame();
+        });
+    </script>
+</body>
+</html>
